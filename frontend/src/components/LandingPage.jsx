@@ -1,171 +1,205 @@
-import React from 'react';
-import { Trophy, Users, Flame } from 'lucide-react';
+import React,{useState} from 'react';
+import { Trophy, Flame, Search, Clock, MapPin } from 'lucide-react';
 
 const LandingPage = () => {
-  const teams = [
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeFilter, setActiveFilter] = useState('all');
+
+  const matches = [
     {
       id: 1,
-      name: "Bengal Warriors",
-      photo: "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=300&h=200&fit=crop&crop=faces",
-      score: 42,
-      matches: 15,
-      wins: 10,
-      gradient: "from-orange-500 to-red-600"
+      team1: { name: "Bengal Warriors", photo: "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=150&h=150&fit=crop&crop=faces", score: 34 },
+      team2: { name: "Patna Pirates", photo: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=150&h=150&fit=crop&crop=faces", score: 28 },
+      status: "FINISHED",
+      venue: "Jawaharlal Nehru Indoor Stadium",
+      date: "Today, 8:00 PM"
     },
     {
       id: 2,
-      name: "Patna Pirates",
-      photo: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=300&h=200&fit=crop&crop=faces",
-      score: 38,
-      matches: 14,
-      wins: 9,
-      gradient: "from-blue-500 to-purple-600"
+      team1: { name: "Dabang Delhi", photo: "https://images.unsplash.com/photo-1594736797933-d0201ba2fe65?w=150&h=150&fit=crop&crop=faces", score: 26 },
+      team2: { name: "U Mumba", photo: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=150&h=150&fit=crop&crop=center", score: 26 },
+      status: "LIVE",
+      time: "25:12",
+      venue: "Shree Shivchhatrapati Sports Complex",
+      date: "Today, 9:00 PM"
     },
     {
       id: 3,
-      name: "Dabang Delhi",
-      photo: "https://images.unsplash.com/photo-1594736797933-d0201ba2fe65?w=300&h=200&fit=crop&crop=faces",
-      score: 45,
-      matches: 16,
-      wins: 11,
-      gradient: "from-green-500 to-teal-600"
+      team1: { name: "Tamil Thalaivas", photo: "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=150&h=150&fit=crop&crop=center", score: 0 },
+      team2: { name: "Jaipur Pink Panthers", photo: "https://images.unsplash.com/photo-1594736797933-d0201ba2fe65?w=150&h=150&fit=crop&crop=faces", score: 0 },
+      status: "UPCOMING",
+      venue: "EKA Arena",
+      date: "Tomorrow, 8:00 PM"
     },
     {
       id: 4,
-      name: "U Mumba",
-      photo: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=300&h=200&fit=crop&crop=center",
-      score: 35,
-      matches: 13,
-      wins: 8,
-      gradient: "from-yellow-500 to-orange-600"
-    },
-    {
-      id: 5,
-      name: "Tamil Thalaivas",
-      photo: "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=300&h=200&fit=crop&crop=center",
-      score: 41,
-      matches: 15,
-      wins: 10,
-      gradient: "from-pink-500 to-rose-600"
-    },
-    {
-      id: 6,
-      name: "Jaipur Pink Panthers",
-      photo: "https://images.unsplash.com/photo-1594736797933-d0201ba2fe65?w=300&h=200&fit=crop&crop=faces",
-      score: 39,
-      matches: 14,
-      wins: 9,
-      gradient: "from-indigo-500 to-blue-600"
+      team1: { name: "UP Yoddhas", photo: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=150&h=150&fit=crop&crop=center", score: 41 },
+      team2: { name: "Patna Pirates", photo: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=150&h=150&fit=crop&crop=faces", score: 39 },
+      status: "FINISHED",
+      venue: "NSCI Dome",
+      date: "Yesterday, 9:00 PM"
     }
   ];
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'LIVE': return 'bg-red-500 text-white animate-pulse';
+      case 'FINISHED': return 'bg-green-500 text-white';
+      case 'UPCOMING': return 'bg-blue-500 text-white';
+      default: return 'bg-gray-500 text-white';
+    }
+  };
+
+  const getWinner = (match) => {
+    if (match.status !== 'FINISHED') return null;
+    return match.team1.score > match.team2.score ? 'team1' :
+      match.team2.score > match.team1.score ? 'team2' : 'draw';
+  };
+
+  const filteredMatches = matches
+    .filter(match => {
+      if (activeFilter === 'all') return true;
+      return match.status.toLowerCase() === activeFilter;
+    })
+    .filter(match => {
+      if (!searchTerm) return true;
+      const term = searchTerm.toLowerCase();
+      return match.team1.name.toLowerCase().includes(term) || match.team2.name.toLowerCase().includes(term);
+    });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Hero Section */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-red-500/20 backdrop-blur-sm"></div>
-        <div className="relative z-10 container mx-auto px-6 py-16 text-center">
-          <div className="flex justify-center mb-6">
-            <div className="p-4 bg-gradient-to-r from-orange-500 to-red-600 rounded-full shadow-2xl">
-              <Flame className="w-12 h-12 text-white" />
+           <div className="relative overflow-hidden w-full">
+        <div className="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-red-500/10 backdrop-blur-sm"></div>
+        <div className="relative z-10 container mx-auto px-6 py-8">
+          
+          {/* Header Row */}
+          <div className="flex justify-between items-center gap-4 mb-8">
+            {/* Left side: Logo & Title */}
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-gradient-to-r from-orange-500 to-red-600 rounded-full shadow-2xl">
+                <Flame className="w-8 h-8 text-white" />
+              </div>
+              <h1 className="text-5xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
+                KABADDI LEAGUE
+              </h1>
+            </div>
+
+            {/* Right side: Auth Buttons */}
+            <div className="flex items-center gap-4">
+              <a href="/login" className="bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white font-semibold py-3 px-8 rounded-xl transition-all duration-300">
+                Login
+              </a>
+              <a href="/signup" className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-bold py-3 px-8 rounded-xl transition-all duration-300 transform hover:scale-105">
+                Sign Up
+              </a>
             </div>
           </div>
-          <h1 className="text-6xl font-bold  mb-4 bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
-            KABADDI LEAGUE
-          </h1>
-          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Experience the thrill of India's most intense sport. Watch your favorite teams battle it out in the ultimate test of strength and strategy.
-          </p>
-          <div className="flex justify-center space-x-8 text-white/80">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-orange-400">12</div>
-              <div className="text-sm">Teams</div>
+
+          {/* Search Bar remains centered */}
+          <div className="max-w-4xl mx-auto">
+            <div className="relative">
+             
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-white z-5" />
+              <input
+                type="text"
+                placeholder="Search for a team..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl py-4 pl-14 pr-6 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
             </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-red-400">156</div>
-              <div className="text-sm">Matches</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-yellow-400">2.5M</div>
-              <div className="text-sm">Fans</div>
-            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* Filter Section */}
+      <div className="container mx-auto px-6 pt-8 pb-12">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex justify-center bg-white/5 backdrop-blur-lg rounded-2xl p-2 border border-white/10">
+            {['all', 'live', 'finished', 'upcoming'].map(filter => (
+              <button
+                key={filter}
+                onClick={() => setActiveFilter(filter)}
+                className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${activeFilter === filter
+                    ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg'
+                    : 'text-gray-300 hover:bg-white/10'
+                  }`}
+              >
+                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Teams Section */}
-      <div className="container mx-auto px-6 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-white mb-4">Championship Teams</h2>
-          <p className="text-gray-400 text-lg">Meet the warriors competing for ultimate glory</p>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {teams.map((team, index) => (
-            <div
-              key={team.id}
-              className="group relative bg-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/10 hover:border-white/20 transition-all duration-500 hover:transform hover:scale-105 hover:shadow-2xl hover:shadow-orange-500/20"
-              style={{
-                animationDelay: `${index * 0.1}s`
-              }}
-            >
-              {/* Gradient Overlay */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${team.gradient} opacity-0 group-hover:opacity-10 rounded-3xl transition-opacity duration-500`}></div>
-              
-              {/* Team Photo */}
-              <div className="relative mb-6 overflow-hidden rounded-2xl">
-                <img
-                  src={team.photo}
-                  alt={team.name}
-                  className="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-110"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-                <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md rounded-full px-3 py-1">
-                  <span className="text-white font-semibold text-sm">#{team.id}</span>
-                </div>
-              </div>
-
-              {/* Team Info */}
-              <div className="relative z-10">
-                <h3 className="text-2xl font-bold text-white mb-3 group-hover:text-orange-400 transition-colors duration-300">
-                  {team.name}
-                </h3>
-                
-                {/* Score Section */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-2">
-                    <Trophy className="w-5 h-5 text-yellow-400" />
-                    <span className="text-gray-300">Score</span>
+      {/* Matches Section */}
+      <div className="container mx-auto px-6 pb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {filteredMatches.length > 0 ? (
+            filteredMatches.map((match) => {
+              const winner = getWinner(match);
+              return (
+                <div key={match.id} className="bg-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/10 transition-all duration-500 hover:border-orange-500/50 hover:shadow-2xl hover:shadow-orange-500/20">
+                  <div className="flex justify-between items-center mb-6">
+                    <span className={`px-3 py-1 rounded-full text-sm font-bold ${getStatusColor(match.status)}`}>
+                      {match.status}
+                    </span>
+                    {match.status === 'LIVE' && (
+                      <div className="flex items-center space-x-2 text-orange-400">
+                        <Clock className="w-4 h-4" />
+                        <span className="font-mono text-sm">{match.time}</span>
+                      </div>
+                    )}
                   </div>
-                  <span className="text-3xl font-bold text-orange-400">{team.score}</span>
-                </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="bg-white/5 rounded-xl p-3 text-center border border-white/10">
-                    <div className="text-2xl font-bold text-blue-400">{team.matches}</div>
-                    <div className="text-gray-400 text-sm">Matches</div>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className={`flex-1 text-center ${winner === 'team1' ? 'scale-105' : ''} transition-transform duration-300`}>
+                      <div className="relative mb-3">
+                        <img src={match.team1.photo} alt={match.team1.name} className={`w-20 h-20 rounded-full mx-auto object-cover border-4 ${winner === 'team1' ? 'border-yellow-400' : 'border-white/20'}`} />
+                        {winner === 'team1' && <Trophy className="w-6 h-6 text-yellow-400 absolute -top-2 -right-2 bg-slate-800 rounded-full p-1" />}
+                      </div>
+                      <h3 className={`font-bold mb-2 ${winner === 'team1' ? 'text-yellow-400' : 'text-white'}`}>{match.team1.name}</h3>
+                      <div className={`text-4xl font-bold ${winner === 'team1' ? 'text-yellow-400' : 'text-orange-400'}`}>{match.status !== 'UPCOMING' ? match.team1.score : '-'}</div>
+                    </div>
+
+                    <div className="px-4">
+                      <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-full p-2">
+                        <span className="text-white font-bold text-sm">VS</span>
+                      </div>
+                    </div>
+
+                    <div className={`flex-1 text-center ${winner === 'team2' ? 'scale-105' : ''} transition-transform duration-300`}>
+                      <div className="relative mb-3">
+                        <img src={match.team2.photo} alt={match.team2.name} className={`w-20 h-20 rounded-full mx-auto object-cover border-4 ${winner === 'team2' ? 'border-yellow-400' : 'border-white/20'}`} />
+                        {winner === 'team2' && <Trophy className="w-6 h-6 text-yellow-400 absolute -top-2 -right-2 bg-slate-800 rounded-full p-1" />}
+                      </div>
+      
+                      <h3 className={`font-bold mb-2 ${winner === 'team2' ? 'text-yellow-400' : 'text-white'}`}>{match.team2.name}</h3>
+                      <div className={`text-4xl font-bold ${winner === 'team2' ? 'text-yellow-400' : 'text-orange-400'}`}>{match.status !== 'UPCOMING' ? match.team2.score : '-'}</div>
+                    </div>
                   </div>
-                  <div className="bg-white/5 rounded-xl p-3 text-center border border-white/10">
-                    <div className="text-2xl font-bold text-green-400">{team.wins}</div>
-                    <div className="text-gray-400 text-sm">Wins</div>
+
+                  <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                    <div className="flex items-center justify-center text-sm text-gray-300">
+                      <MapPin className="w-4 h-4 mr-2" />
+                      <span>{match.venue}, {match.date}</span>
+                    </div>
                   </div>
                 </div>
-
-                {/* Action Button */}
-                <button className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 transform hover:translate-y-[-2px] hover:shadow-lg flex items-center justify-center space-x-2">
-                  <Users className="w-4 h-4" />
-                  <span>View Team</span>
-                </button>
-              </div>
-
-              {/* Hover Effect Border */}
-              <div className="absolute inset-0 rounded-3xl border-2 border-transparent group-hover:border-orange-400/30 transition-colors duration-500 pointer-events-none"></div>
+              );
+            })
+          ) : (
+            <div className="lg:col-span-2 text-center py-16 bg-white/5 rounded-3xl">
+              <h3 className="text-2xl font-bold text-white">No Matches Found</h3>
+              <p className="text-gray-400 mt-2">Try adjusting your search or filter.</p>
             </div>
-          ))}
+          )}
         </div>
       </div>
-
       {/* Footer CTA */}
       <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 py-16">
         <div className="container mx-auto px-6 text-center">
