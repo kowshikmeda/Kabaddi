@@ -6,6 +6,7 @@ import PlayerProfile from './components/PlayerProfile';
 import CreateMatch from './components/CreateMatch';
 import UpdateMatch from './components/UpdateMatch';
 import UserProfile from './components/UserProfile';
+import Login from './components/Login';
 
 const App = () => {
   return (
@@ -17,7 +18,7 @@ const App = () => {
       <Route path="/new-match" element={<CreateMatch />} />
        <Route path="/update-match" element={<UpdateMatch />} />
        <Route path="/user-profile" element={<UserProfile/>} />
-
+     <Route path="/login" element={<Login/>} />
 
     </Routes>
   )
