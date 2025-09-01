@@ -1,93 +1,178 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom'; // Assuming you use React Router for IDs
+import axios from 'axios';
 import { Trophy, Target, Shield, Calendar, MapPin, TrendingUp, Users, ArrowUp, ArrowDown } from 'lucide-react';
+import { baseURL } from '../utils/constants';
+import BackButton from './BackButton';
 
 const PlayerProfile = () => {
-  const player = {
-    id: 1,
-    name: "Pardeep Narwal",
-    nickname: "The Dubki King",
-    photo: "https://images.unsplash.com/photo-1566753323558-f4e0952af115?w=400&h=400&fit=crop&crop=face",
-    team: "Patna Pirates",
-    teamLogo: "https://images.unsplash.com/photo-1594736797933-d0201ba2fe65?w=100&h=100&fit=crop",
-    position: "Raider",
-    jerseyNumber: 16,
-    age: 27,
-    height: "5'9\"",
-    weight: "75 kg",
-    hometown: "Rindhana, Haryana",
-    debut: "2014",
+  // const player = {
+//   id: 1,
+//   name: "Pardeep Narwal",
+//   nickname: "The Dubki King",
+//   photo: "https://images.unsplash.com/photo-1566753323558-f4e0952af115?w=400&h=400&fit=crop&crop=face",
+//   team: "Patna Pirates",
+//   teamLogo: "https://images.unsplash.com/photo-1594736797933-d0201ba2fe65?w=100&h=100&fit=crop",
+//   position: "Raider",
+//   jerseyNumber: 16,
+//   age: 27,
+//   height: "5'9"",
+//   weight: "75 kg",
+//   hometown: "Rindhana, Haryana",
+//   debut: "2014",
+//   careerStats: {
+//     totalMatches: 142,
+//     totalPoints: 1674,
+//     raidPoints: 1589,
+//     tacklePoints: 85,
+//     successfulRaids: 892,
+//     raidSuccessRate: 65.8,
+//     averagePoints: 11.8,
+//     superRaids: 156,
+//     super10s: 89,
+//     doOrDieRaidSuccess: 72.3
+//   },
+//   lastFiveMatches: [
+//     {
+//       date: "2024-08-20",
+//       opponent: "Bengal Warriors",
+//       venue: "EKA Arena",
+//       result: "Won",
+//       score: "34-28",
+//       playerPoints: 15,
+//       raidPoints: 14,
+//       tacklePoints: 1,
+//       performance: "excellent"
+//     },
+//     {
+//       date: "2024-08-17",
+//       opponent: "Dabang Delhi",
+//       venue: "Thyagaraj Complex",
+//       result: "Lost",
+//       score: "26-31",
+//       playerPoints: 12,
+//       raidPoints: 11,
+//       tacklePoints: 1,
+//       performance: "good"
+//     },
+//     {
+//       date: "2024-08-14",
+//       opponent: "U Mumba",
+//       venue: "NSCI Dome",
+//       result: "Won",
+//       score: "38-29",
+//       playerPoints: 18,
+//       raidPoints: 16,
+//       tacklePoints: 2,
+//       performance: "excellent"
+//     },
+//     {
+//       date: "2024-08-11",
+//       opponent: "Tamil Thalaivas",
+//       venue: "Nehru Stadium",
+//       result: "Won",
+//       score: "35-30",
+//       playerPoints: 13,
+//       raidPoints: 12,
+//       tacklePoints: 1,
+//       performance: "good"
+//     },
+//     {
+//       date: "2024-08-08",
+//       opponent: "Jaipur Pink Panthers",
+//       venue: "Sawai Mansingh Stadium",
+//       result: "Lost",
+//       score: "28-33",
+//       playerPoints: 8,
+//       raidPoints: 7,
+//       tacklePoints: 1,
+//       performance: "average"
+//     }
+//   ]
+// };
+  // State for player data, loading, and error handling
+  const [player, setPlayer] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // Get the player ID from the URL, e.g., /players/123
+  const { id } = useParams();
 
-    careerStats: {
-      totalMatches: 142,
-      totalPoints: 1674,
-      raidPoints: 1589,
-      tacklePoints: 85,
-      successfulRaids: 892,
-      raidSuccessRate: 65.8,
-      averagePoints: 11.8,
-      superRaids: 156,
-      super10s: 89,
-      doOrDieRaidSuccess: 72.3
-    },
-    
-    lastFiveMatches: [
-      {
-        date: "2024-08-20",
-        opponent: "Bengal Warriors",
-        venue: "EKA Arena",
-        result: "Won",
-        score: "34-28",
-        playerPoints: 15,
-        raidPoints: 14,
-        tacklePoints: 1,
-        performance: "excellent"
-      },
-      {
-        date: "2024-08-17",
-        opponent: "Dabang Delhi",
-        venue: "Thyagaraj Complex",
-        result: "Lost",
-        score: "26-31",
-        playerPoints: 12,
-        raidPoints: 11,
-        tacklePoints: 1,
-        performance: "good"
-      },
-      {
-        date: "2024-08-14",
-        opponent: "U Mumba",
-        venue: "NSCI Dome",
-        result: "Won",
-        score: "38-29",
-        playerPoints: 18,
-        raidPoints: 16,
-        tacklePoints: 2,
-        performance: "excellent"
-      },
-      {
-        date: "2024-08-11",
-        opponent: "Tamil Thalaivas",
-        venue: "Nehru Stadium",
-        result: "Won",
-        score: "35-30",
-        playerPoints: 13,
-        raidPoints: 12,
-        tacklePoints: 1,
-        performance: "good"
-      },
-      {
-        date: "2024-08-08",
-        opponent: "Jaipur Pink Panthers",
-        venue: "Sawai Mansingh Stadium",
-        result: "Lost",
-        score: "28-33",
-        playerPoints: 8,
-        raidPoints: 7,
-        tacklePoints: 1,
-        performance: "average"
+  useEffect(() => {
+    // Hardcoded ID for demonstration if not available from URL
+    const playerId = id || 'some-player-id';
+  console.log("Fetching data for player ID:", playerId);
+    const fetchPlayerData = async () => {
+      try {
+        // Fetch both user and profile data in parallel
+        const [userResponse, profileResponse] = await Promise.all([
+          axios.get(baseURL+`/users/user/${playerId}`),
+          axios.get(baseURL+`/users/user/${playerId}/profile`)
+        ]);
+
+        const userData = userResponse.data;
+        const profileData = profileResponse.data;
+        
+        // Transform the API data into the structure the UI expects
+        const transformedData = {
+          id: userData.id,
+          name: userData.name,
+          nickname: userData.about || "The Finisher", // Fallback nickname
+           photo: userData.url ,// || `https://ui-avatars.com/api/john}&background=random`,
+          team: "Team Name", // Placeholder as it's not in API
+         // teamLogo: "https://via.placeholder.com/100", // Placeholder
+          position: "Raider", // Placeholder
+          jerseyNumber: Math.floor(Math.random() * 100), // Placeholder
+          age: userData.age,
+          height: `${Math.floor(userData.height / 30.48)}'${Math.round((userData.height % 30.48) / 2.54)}"`, // Assuming cm
+          weight: `${userData.weight} kg`,
+          hometown: userData.location,
+          debut: new Date(profileData.debutMatch).getFullYear().toString(),
+
+          careerStats: {
+            totalMatches: profileData.totalMatches,
+            totalPoints: profileData.totalPoints,
+            raidPoints: profileData.raidPoints,
+            tacklePoints: profileData.tacklePoints,
+            // Calculate average points
+            averagePoints: profileData.totalMatches > 0 ? (profileData.totalPoints / profileData.totalMatches).toFixed(1) : 0,
+             // Calculate success rate as a percentage of total points
+            raidSuccessRate: profileData.totalPoints > 0 ? ((profileData.raidPoints / profileData.totalPoints) * 100).toFixed(1) : 0
+          },
+          
+          // Transform recent matches data
+          lastFiveMatches: profileData.matches.slice(0, 5).map(match => {
+            const isWin = match.team1Score > match.team2Score; // Assumption
+            let performance = 'average';
+            if (match.totalPoints >= 15) performance = 'excellent';
+            else if (match.totalPoints >= 10) performance = 'good';
+            else if (match.totalPoints < 5) performance = 'poor';
+
+            return {
+              date: new Date(match.matchDate).toISOString().split('T')[0],
+              opponent: match.oppositeTeamName,
+              venue: match.location,
+              result: isWin ? "Won" : "Lost",
+              score: `${match.team1Score}-${match.team2Score}`,
+              playerPoints: match.totalPoints,
+              raidPoints: match.raidPoints,
+              tacklePoints: match.tacklePoints,
+              performance: performance
+            };
+          })
+        };
+        
+        setPlayer(transformedData);
+      } catch (err) {
+        setError("Failed to fetch player data. Please try again later.");
+        console.error(err);
+      } finally {
+        setLoading(false);
       }
-    ]
-  };
+    };
+
+    fetchPlayerData();
+  }, [id]); // Refetch if the ID in the URL changes
 
   const getPerformanceColor = (performance) => {
     switch (performance) {
@@ -103,8 +188,21 @@ const PlayerProfile = () => {
     return result === 'Won' ? 'text-green-400' : 'text-red-400';
   };
 
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center text-white text-2xl">Loading Player Profile...</div>;
+  }
+
+  if (error) {
+    return <div className="min-h-screen flex items-center justify-center text-red-400 text-2xl">{error}</div>;
+  }
+
+  if (!player) {
+    return null; // Or a "Player not found" message
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
+      <BackButton/>
       <div className="container mx-auto max-w-7xl">
         
         <div className="text-center mb-8">

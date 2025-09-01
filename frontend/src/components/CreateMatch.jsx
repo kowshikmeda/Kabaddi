@@ -1,26 +1,17 @@
-import React, { useState } from 'react';
-import { Plus, X, Calendar, MapPin, Users, Trophy, Search, Save, Camera } from 'lucide-react';
-
-// Mock database of all available players
-const allPlayers = [
-  { id: 1, name: 'Pardeep Narwal', position: 'raider' },
-  { id: 2, name: 'Maninder Singh', position: 'raider' },
-  { id: 3, name: 'Naveen Kumar', position: 'raider' },
-  { id: 4, name: 'Fazel Atrachali', position: 'defender' },
-  { id: 5, name: 'Sunil Kumar', position: 'defender' },
-  { id: 6, name: 'Mohammadreza Chiyaneh', position: 'all-rounder' },
-  { id: 7, name: 'Deepak Hooda', position: 'all-rounder' },
-  { id: 8, name: 'Sachin Tanwar', position: 'raider' },
-  { id: 9, name: 'Girish Ernak', position: 'defender' },
-  { id: 10, name: 'Ashu Malik', position: 'raider' },
-  { id: 11, name: 'Sagar Rathee', position: 'defender' },
-  { id: 12, name: 'Pawan Sehrawat', position: 'raider' },
-  { id: 13, name: 'Nitesh Kumar', position: 'defender' },
-  { id: 14, name: 'Surender Gill', position: 'raider' },
-];
-
+import React, { useState, useEffect } from 'react';
+import { Plus, X, Calendar, MapPin, Users, Trophy, Search, Save, Camera } from 'lucide-react'; // Removed Cookie as it's not a Lucide icon
+import axios from 'axios';
+import { baseURL } from '../utils/constants';
+import Cookies from 'universal-cookie';
+import { useNavigate } from 'react-router-dom';
+import BackButton from './BackButton';
 
 const CreateMatch = () => {
+  const Cookie = new Cookies();
+  const token = Cookie.get('token');
+  
+  const [allPlayers, setAllPlayers] = useState([]);
+  
   const [formData, setFormData] = useState({
     venue: '',
     date: '',
@@ -40,6 +31,50 @@ const CreateMatch = () => {
   const [searchTerms, setSearchTerms] = useState({ team1: '', team2: '' });
   const [activeStep, setActiveStep] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
+  const [loading, setLoading] = useState(false); // New loading state
+  const userId = localStorage.getItem("user");
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchPlayers();
+  }, []);
+
+  useEffect(() => {
+    if (showPreview) {
+      console.log("Preview is visible. Setting a 10-second timer to navigate.");
+      const timer = setTimeout(() => {
+        console.log("Timer finished. Navigating to /mymatches.");
+        navigate('/mymatches');
+      }, 10000); 
+
+      return () => {
+        console.log("Cleaning up the navigation timer.");
+        clearTimeout(timer);
+      };
+    }
+  }, [showPreview, navigate]); 
+
+  const fetchPlayers = async () => {
+    try {
+      const response = await axios.get(baseURL + '/users/all', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const playerPositions = ['raider', 'defender', 'all-rounder'];
+      const transformedPlayers = response.data.map(user => ({
+        id: user.playerId,
+        name: user.playerName,
+        position: playerPositions[Math.floor(Math.random() * playerPositions.length)]
+      }));
+      
+      setAllPlayers(transformedPlayers);
+    } catch (error) {
+      console.error("Failed to fetch players:", error);
+      alert("Could not load player data. Please try again later.");
+    }
+  };
 
   const positions = [
     { value: 'raider', label: 'Raider', color: 'text-red-400' },
@@ -89,6 +124,10 @@ const CreateMatch = () => {
     }));
   };
 
+  const getTodayString = () => {
+    return new Date().toISOString().slice(0, 10);
+  };
+
   const validateForm = () => {
     const errors = [];
     if (!formData.venue) errors.push('Venue is required');
@@ -100,12 +139,51 @@ const CreateMatch = () => {
     return errors;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    setLoading(true); // Set loading to true when submission starts
     const errors = validateForm();
-    if (errors.length === 0) {
-      setShowPreview(true);
-    } else {
+    if (errors.length > 0) {
       alert('Please fix the following errors:\n' + errors.join('\n'));
+      setLoading(false); // Reset loading if validation fails
+      return;
+    }
+
+    const apiFormData = new FormData();
+    apiFormData.append('matchName', `${formData.team1.name} vs ${formData.team2.name}`);
+    apiFormData.append('team1Name', formData.team1.name);
+    apiFormData.append('team2Name', formData.team2.name);
+    if (formData.team1.logo) {
+      apiFormData.append('team1Photo', formData.team1.logo);
+    }
+    if (formData.team2.logo) {
+      apiFormData.append('team2Photo', formData.team2.logo);
+    }
+    apiFormData.append('createdBy', userId);
+    
+    formData.team1.players.forEach(player => {
+      apiFormData.append('team1Players', player.id);
+    });
+
+    formData.team2.players.forEach(player => {
+      apiFormData.append('team2Players', player.id);
+    });
+    apiFormData.append('totalDuration', 5);
+    apiFormData.append('location', formData.venue);
+    apiFormData.append('matchDate', formData.date);
+
+    try {
+      await axios.post(baseURL + '/matches/create', apiFormData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      setShowPreview(true);
+    } catch (error) {
+      console.error("Failed to create match:", error);
+      alert(`Error creating match: ${error.response ? error.response.data.message : error.message}`);
+    } finally {
+      setLoading(false); // Reset loading when API call completes (success or failure)
     }
   };
 
@@ -204,6 +282,7 @@ const CreateMatch = () => {
   if (showPreview) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
+        <BackButton/>
         <div className="container mx-auto max-w-4xl">
           <div className="bg-white/5 backdrop-blur-lg rounded-3xl border border-white/10 overflow-hidden">
             <div className="bg-gradient-to-r from-green-500/20 to-teal-500/20 p-6 border-b border-white/10 flex items-center justify-between">
@@ -248,6 +327,7 @@ const CreateMatch = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
+      <BackButton/>
       <div className="container mx-auto max-w-6xl">
         <div className="text-center mb-8">
           <h1 className="text-5xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
@@ -281,7 +361,7 @@ const CreateMatch = () => {
                 </div>
                 <div>
                   <label className="block text-gray-300 font-medium mb-2">Date</label>
-                  <input type="date" value={formData.date} onChange={(e) => handleInputChange('date', e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500" />
+                  <input type="date" value={formData.date} min={getTodayString()} onChange={(e) => handleInputChange('date', e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500" />
                 </div>
               </div>
             </div>
@@ -330,11 +410,27 @@ const CreateMatch = () => {
 
           <div className="bg-white/5 px-8 py-6 border-t border-white/10">
             <div className="flex justify-between">
-              <button onClick={() => setActiveStep(s => Math.max(1, s - 1))} disabled={activeStep === 1} className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl disabled:opacity-50">Previous</button>
+              <button onClick={() => setActiveStep(s => Math.max(1, s - 1))} disabled={activeStep === 1 || loading} className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl disabled:opacity-50">Previous</button>
               {activeStep < 4 ? (
-                <button onClick={() => setActiveStep(s => Math.min(4, s + 1))} className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105">Next</button>
+                <button onClick={() => setActiveStep(s => Math.min(4, s + 1))} disabled={loading} className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50">Next</button>
               ) : (
-                <button onClick={handleSubmit} className="bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white px-8 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 flex items-center space-x-2"><Save className="w-5 h-5" /><span>Create Match</span></button>
+                <button 
+                  onClick={handleSubmit} 
+                  disabled={loading} // Disable button when loading
+                  className="bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white px-8 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <>
+                      <Save className="w-5 h-5" />
+                      <span>Create Match</span>
+                    </>
+                  )}
+                </button>
               )}
             </div>
           </div>
