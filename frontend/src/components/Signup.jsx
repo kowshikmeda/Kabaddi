@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { User, Mail, Lock, UserPlus, Hash, BarChart, TrendingUp, Loader2 } from 'lucide-react'; // ⬅️ Loader2 icon for spinner
 import { baseURL } from '../utils/constants';
@@ -186,9 +186,9 @@ const Signup = () => {
 
           {/* Login Link */}
           <div className="text-center">
-            <a href="/login" className="font-medium text-sm text-gray-400 hover:text-orange-400 transition-colors">
+            <Link to="/login" className="font-medium text-sm text-gray-400 hover:text-orange-400 transition-colors">
               Already have an account? Sign In
-            </a>
+            </Link>
           </div>
         </form>
       </div>

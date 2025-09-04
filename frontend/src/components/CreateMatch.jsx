@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, Calendar, MapPin, Users, Trophy, Search, Save, Camera } from 'lucide-react'; // Removed Cookie as it's not a Lucide icon
+import { Plus, X, Calendar, MapPin, Users, Trophy, Search, Save, Camera, Clock } from 'lucide-react'; // Added Clock icon
 import axios from 'axios';
 import { baseURL } from '../utils/constants';
 import Cookies from 'universal-cookie';
@@ -15,6 +15,7 @@ const CreateMatch = () => {
   const [formData, setFormData] = useState({
     venue: '',
     date: '',
+    time: '40', // New: Default match duration in minutes
     team1: {
       name: '',
       logo: null,
@@ -31,7 +32,7 @@ const CreateMatch = () => {
   const [searchTerms, setSearchTerms] = useState({ team1: '', team2: '' });
   const [activeStep, setActiveStep] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
-  const [loading, setLoading] = useState(false); // New loading state
+  const [loading, setLoading] = useState(false);
   const userId = localStorage.getItem("user");
   const navigate = useNavigate();
 
@@ -41,11 +42,11 @@ const CreateMatch = () => {
 
   useEffect(() => {
     if (showPreview) {
-      console.log("Preview is visible. Setting a 10-second timer to navigate.");
+      console.log("Preview is visible. Setting a 5-second timer to navigate.");
       const timer = setTimeout(() => {
         console.log("Timer finished. Navigating to /mymatches.");
         navigate('/mymatches');
-      }, 10000); 
+      }, 5000); 
 
       return () => {
         console.log("Cleaning up the navigation timer.");
@@ -80,15 +81,6 @@ const CreateMatch = () => {
     { value: 'raider', label: 'Raider', color: 'text-red-400' },
     { value: 'defender', label: 'Defender', color: 'text-blue-400' },
     { value: 'all-rounder', label: 'All-Rounder', color: 'text-green-400' }
-  ];
-
-  const venues = [
-    'Jawaharlal Nehru Indoor Stadium',
-    'Thyagaraj Sports Complex',
-    'Kanteerava Indoor Stadium',
-    'EKA Arena',
-    'Shree Shivchhatrapati Sports Complex',
-    'Gachibowli Indoor Stadium',
   ];
 
   const handleInputChange = (field, value) => {
@@ -132,6 +124,7 @@ const CreateMatch = () => {
     const errors = [];
     if (!formData.venue) errors.push('Venue is required');
     if (!formData.date) errors.push('Date is required');
+    if (!formData.time || parseInt(formData.time) <= 0) errors.push('Match duration must be a positive number');
     if (!formData.team1.name) errors.push('Team 1 name is required');
     if (!formData.team2.name) errors.push('Team 2 name is required');
     if (formData.team1.players.length < 7) errors.push('Team 1 must have at least 7 players');
@@ -140,11 +133,11 @@ const CreateMatch = () => {
   };
 
   const handleSubmit = async () => {
-    setLoading(true); // Set loading to true when submission starts
+    setLoading(true);
     const errors = validateForm();
     if (errors.length > 0) {
       alert('Please fix the following errors:\n' + errors.join('\n'));
-      setLoading(false); // Reset loading if validation fails
+      setLoading(false);
       return;
     }
 
@@ -167,7 +160,7 @@ const CreateMatch = () => {
     formData.team2.players.forEach(player => {
       apiFormData.append('team2Players', player.id);
     });
-    apiFormData.append('totalDuration', 5);
+    apiFormData.append('totalDuration', parseInt(formData.time)); // Use the new time field
     apiFormData.append('location', formData.venue);
     apiFormData.append('matchDate', formData.date);
 
@@ -183,7 +176,7 @@ const CreateMatch = () => {
       console.error("Failed to create match:", error);
       alert(`Error creating match: ${error.response ? error.response.data.message : error.message}`);
     } finally {
-      setLoading(false); // Reset loading when API call completes (success or failure)
+      setLoading(false);
     }
   };
 
@@ -298,6 +291,7 @@ const CreateMatch = () => {
                   <div className="grid grid-cols-2 gap-4 text-gray-300">
                     <div><span className="text-orange-400">Venue:</span> {formData.venue}</div>
                     <div><span className="text-orange-400">Date:</span> {formData.date}</div>
+                    <div><span className="text-orange-400">Duration:</span> {formData.time} mins</div> {/* Display duration */}
                   </div>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -351,17 +345,46 @@ const CreateMatch = () => {
           {activeStep === 1 && (
             <div className="p-8">
               <h2 className="text-2xl font-bold text-white mb-6">Match Details</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6"> {/* Changed to 3 columns */}
                 <div>
                   <label className="block text-gray-300 font-medium mb-2">Venue</label>
-                  <select value={formData.venue} onChange={(e) => handleInputChange('venue', e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500">
-                    <option value="" className="bg-slate-800">Select Venue</option>
-                    {venues.map(venue => (<option key={venue} value={venue} className="bg-slate-800">{venue}</option>))}
-                  </select>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Enter venue name"
+                      value={formData.venue}
+                      onChange={(e) => handleInputChange('venue', e.target.value)}
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 pl-12 py-3 text-white placeholder-gray-400 focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-gray-300 font-medium mb-2">Date</label>
-                  <input type="date" value={formData.date} min={getTodayString()} onChange={(e) => handleInputChange('date', e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500" />
+                  <div className="relative">
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input 
+                      type="date" 
+                      value={formData.date} 
+                      min={getTodayString()} 
+                      onChange={(e) => handleInputChange('date', e.target.value)} 
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 pl-12 py-3 text-white focus:ring-2 focus:ring-orange-500" 
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-gray-300 font-medium mb-2">Duration (mins)</label>
+                  <div className="relative">
+                    <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input 
+                      type="number" 
+                      value={formData.time} 
+                      onChange={(e) => handleInputChange('time', e.target.value)} 
+                      min="1" // Minimum duration
+                      placeholder="e.g., 40"
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 pl-12 py-3 text-white placeholder-gray-400 focus:ring-2 focus:ring-orange-500" 
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -376,9 +399,10 @@ const CreateMatch = () => {
               <div className="space-y-6">
                 <div className="p-6 bg-white/5 rounded-2xl border border-white/10">
                   <h3 className="text-xl font-bold text-white mb-4">Match Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-300">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-gray-300"> {/* Changed to 3 columns */}
                     <div><span className="text-orange-400">Venue:</span> {formData.venue || 'Not set'}</div>
                     <div><span className="text-orange-400">Date:</span> {formData.date || 'Not set'}</div>
+                    <div><span className="text-orange-400">Duration:</span> {formData.time} mins</div> {/* Display duration */}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -416,7 +440,7 @@ const CreateMatch = () => {
               ) : (
                 <button 
                   onClick={handleSubmit} 
-                  disabled={loading} // Disable button when loading
+                  disabled={loading}
                   className="bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white px-8 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (

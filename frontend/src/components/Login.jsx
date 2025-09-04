@@ -3,7 +3,7 @@ import { Lock, User, Loader2 } from 'lucide-react'; // Import Loader2 for the sp
 import { baseURL } from '../utils/constants';
 import axios from 'axios';
 import Cookies from 'universal-cookie';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -46,7 +46,7 @@ const Login = () => {
             <Lock className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
-            Admin Access
+            welcome back!
           </h1>
           <p className="text-gray-400 mt-2">Sign in to manage your matches</p>
         </div>
@@ -125,6 +125,12 @@ const Login = () => {
               'Sign In'
             )}
           </button>
+           {/* signup link*/}
+           <div className="text-center">
+            <Link to="/signup" className="font-medium text-sm text-gray-400 hover:text-orange-400 transition-colors">
+              Create a new account? Sign up
+            </Link>
+          </div>
         </form>
       </div>
     </div>

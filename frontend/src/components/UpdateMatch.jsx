@@ -1,7 +1,7 @@
- import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import { Trophy, Users, Clock, Plus, Minus, Play, Pause, Power, FlagOff } from 'lucide-react';
+import { Trophy, Users, Clock, Plus, Minus, Play, Pause, Power, FlagOff, Loader2 } from 'lucide-react'; // Added Loader2
 import { baseURL } from '../utils/constants';
 import Cookies from 'universal-cookie';
 import ProfileDropdown from './ProfileDropdown';
@@ -9,7 +9,6 @@ import BackButton from './BackButton';
 
 // Helper function to convert a total number of seconds into a MM:SS string for display.
 const secondsToTime = (totalSeconds) => {
-  // Ensure the input is a valid number
   const secondsNum = parseInt(totalSeconds, 10);
   if (isNaN(secondsNum) || secondsNum < 0) {
       return '00:00';
@@ -19,144 +18,204 @@ const secondsToTime = (totalSeconds) => {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
 
-
 const UpdateMatch = () => {
   const Cookie = new Cookies();
   const token = Cookie.get('token');
   const { id: matchId } = useParams();
   const currentUserID = localStorage.getItem('user');
 
-
   const [matchData, setMatchData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // State to hold the backend's remainingDuration and the timestamp it was fetched
+  const [serverTime, setServerTime] = useState({ remaining: 0, fetchedAt: 0 });
+  // State for the client-calculated displayed time
+  const [displayTime, setDisplayTime] = useState(0);
+
   const [updateForm, setUpdateForm] = useState({
     selectedTeam: 'teamA',
     selectedPlayer: '',
-    pointType: 'raid',
+    pointType: 'raid', // Default to raid
     points: 1
   });
 
-  // Effect to fetch initial match data
-  useEffect(() => {
+  const [isUpdatingScore, setIsUpdatingScore] = useState(false); // New state for loading spinner on buttons
+
+  const mainIntervalRef = useRef(null); // Ref for the 1-second display timer
+  const syncIntervalRef = useRef(null); // Ref for the periodic backend sync
+
+  // Function to fetch match details and update state
+  const fetchMatchDetails = useCallback(async (showLoading = true) => {
     if (!matchId) return;
-    const fetchMatchDetails = async () => {
-      try {
-        setLoading(true);
-        const response = await axios.get(baseURL + `/matchstats/match/livescorecard/${matchId}/user`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const apiData = response.data;
+    try {
+      if (showLoading) setLoading(true);
+      const response = await axios.get(baseURL + `/matchstats/match/livescorecard/${matchId}/user`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const apiData = response.data;
+      const now = Date.now(); // Capture exact time of successful fetch
 
-        const transformPlayers = (players) => players.map(p => ({
-          id: p.playerId, name: p.playerName, raidPoints: p.raidPoints, tacklePoints: p.tacklePoints,
-        }));
-        const team1Players = transformPlayers(apiData.team1);
-        const team2Players = transformPlayers(apiData.team2);
+      const transformPlayers = (players) => players.map(p => ({
+        id: p.playerId, name: p.playerName, raidPoints: p.raidPoints, tacklePoints: p.tacklePoints,
+      }));
+      const team1Players = transformPlayers(apiData.team1);
+      const team2Players = transformPlayers(apiData.team2);
 
-        const transformedData = {
-          teamA: {
-            name: apiData.team1Name,
-            score: team1Players.reduce((sum, p) => sum + p.raidPoints + p.tacklePoints, 0),
-            color: 'from-red-500 to-red-600',
-            players: team1Players,
-          },
-          teamB: {
-            name: apiData.team2Name,
-            score: team2Players.reduce((sum, p) => sum + p.raidPoints + p.tacklePoints, 0),
-            color: 'from-blue-500 to-blue-600',
-            players: team2Players,
-          },
-          // Directly store the number of seconds from the API
-          timeRemaining: apiData.remainingDuration , // e.g., 1200
-          status: apiData.status || 'UPCOMING',
-        };
-        setMatchData(transformedData);
-        if (transformedData.teamA.players.length > 0) {
-          setUpdateForm(prev => ({ ...prev, selectedPlayer: transformedData.teamA.players[0].id }));
+      const transformedData = {
+        teamA: {
+          name: apiData.team1Name,
+          score: apiData.team1Score,
+          color: 'from-red-500 to-red-600',
+          players: team1Players,
+        },
+        teamB: {
+          name: apiData.team2Name,
+          score: apiData.team2Score,
+          color: 'from-blue-500 to-blue-600',
+          players: team2Players,
+        },
+        status: apiData.status || 'UPCOMING',
+      };
+      setMatchData(transformedData);
+      setServerTime({ remaining: apiData.remainingDuration, fetchedAt: now }); // Update server time reference
+
+      // Set initial selected player if not already set, or if team changed
+      // This part now uses the *latest* `updateForm` state via a functional update
+      setUpdateForm(prev => {
+        const currentTeamPlayers = transformedData[prev.selectedTeam]?.players || [];
+        const isCurrentPlayerStillValid = currentTeamPlayers.some(p => p.id === prev.selectedPlayer);
+
+        if (!prev.selectedPlayer || !isCurrentPlayerStillValid) {
+          return {
+            ...prev,
+            selectedPlayer: currentTeamPlayers.length > 0 ? currentTeamPlayers[0].id : ''
+          };
         }
-      } catch (err) {
-        setError("Failed to fetch match data.");
-        console.error(err);
-      } finally {
-        setLoading(false);
+        return prev; // No change needed for selectedPlayer
+      });
+
+      setError(null); // Clear any previous errors
+    } catch (err) {
+      setError("Failed to fetch match data.");
+      console.error(err);
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  }, [matchId, token]); // Dependencies updated: Removed updateForm.selectedPlayer, updateForm.selectedTeam
+
+  // Effect for initial fetch and visibility change listener
+  useEffect(() => {
+    // Only fetch match details on initial mount
+    fetchMatchDetails();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // When tab becomes visible, re-sync with backend immediately
+        console.log("Tab is visible, re-fetching match details for re-sync...");
+        fetchMatchDetails(false); // Don't show loading spinner
       }
     };
-    fetchMatchDetails();
-  }, [matchId, token]);
 
-  // Countdown Timer now works with seconds directly
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (mainIntervalRef.current) clearInterval(mainIntervalRef.current);
+      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
+    };
+    // Removed updateForm.selectedPlayer and updateForm.selectedTeam from dependencies
+  }, [fetchMatchDetails]); // fetchMatchDetails itself is stable due to useCallback
+
+
+  // Effect for managing the display timer and periodic backend sync
   useEffect(() => {
-    if (!matchData || matchData.status !== 'LIVE') {
-      return;
+    // Clear any existing intervals
+    if (mainIntervalRef.current) clearInterval(mainIntervalRef.current);
+    if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
+
+    if (matchData && matchData.status === 'LIVE' && serverTime.remaining > 0) {
+      // 1. Start a main interval to update display time every second
+      mainIntervalRef.current = setInterval(() => {
+        const elapsedTimeSinceFetch = Math.floor((Date.now() - serverTime.fetchedAt) / 1000);
+        const calculatedTime = Math.max(0, serverTime.remaining - elapsedTimeSinceFetch);
+
+        setDisplayTime(calculatedTime);
+
+        // If calculated time runs out, end the match
+        if (calculatedTime <= 0) {
+          clearInterval(mainIntervalRef.current);
+          mainIntervalRef.current = null;
+          // Trigger backend end action only if it hasn't been triggered already
+          // The fetchMatchDetails after handleStatusChange will update status to COMPLETED
+          // which will stop this block from running again.
+          if (matchData.status === 'LIVE') {
+            handleStatusChange('end');
+          }
+        }
+      }, 1000);
+
+      // 2. Start a periodic server synchronization interval
+      syncIntervalRef.current = setInterval(() => {
+        console.log("Periodic server sync for timer drift correction...");
+        fetchMatchDetails(false); // Fetch latest remainingDuration from backend
+      }, 50000); // Re-sync every 10 seconds
+
+    } else {
+      // If not LIVE, ensure display time matches the last known server remaining time
+      setDisplayTime(serverTime.remaining);
     }
 
-    const timer = setInterval(() => {
-      setMatchData(prevData => {
-        // Stop if status changes while timer is running
-        if (prevData.status !== 'LIVE') {
-            clearInterval(timer);
-            return prevData;
-        }
-
-        // End the match if time runs out
-        if (prevData.timeRemaining <= 1) { // Check for <= 1 to ensure it ticks down to 00:00 before ending
-          clearInterval(timer);
-          handleStatusChange('end'); // Call the end route
-          return { ...prevData, timeRemaining: 0, status: 'COMPLETED' }; // Update local state to reflect completion
-        }
-
-        // Decrement the seconds count
-        return { ...prevData, timeRemaining: prevData.timeRemaining - 1 };
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [matchData?.status, matchData?.timeRemaining]); // Added matchData.timeRemaining to dependencies for re-evaluation
+    // Cleanup function
+    return () => {
+      if (mainIntervalRef.current) clearInterval(mainIntervalRef.current);
+      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
+    };
+  }, [matchData?.status, serverTime, fetchMatchDetails]); // Depend on matchData status and serverTime updates
 
 
   const pointTypes = [
     { value: 'raid', label: 'Raid Point', points: [1, 2, 3, 4, 5, 6, 7] },
     { value: 'tackle', label: 'Tackle Point', points: [1, 2] },
-    { value: 'bonus', label: 'Bonus Point', points: [1] },
-    { value: 'technical', label: 'Technical Point', points: [1, 2] },
-    { value: 'allout', label: 'All Out', points: [2] }
+     { value: 'allout', label: 'Allout Point', points: [2] },
+      { value: 'technical', label: 'Technical Point', points: [1] }
+
+    // Removed bonus and all-out points as per instructions
   ];
 
-  // CORRECTED handleStatusChange function
   const handleStatusChange = async (actionType) => {
     try {
       const response = await axios.put(`${baseURL}/matches/match/${actionType}/${matchId}/${currentUserID}`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       console.log(`Match ${actionType} response:`, response.data);
 
-      const updatedMatchDto = response.data; // This is the MatchDto from your backend
+      const updatedMatchDto = response.data; // This is a MatchDto, not a ScoreCard
+      const now = Date.now();
 
-      // Update the local matchData state with the full updated object
+      // Update basic match status and server time from the response
       setMatchData(prev => {
-        // We'll keep the existing team data and only update the top-level match properties
-        // that are part of the MatchDto (status, timeRemaining).
-        // This ensures player data and scores are not accidentally overwritten.
-        const newMatchData = {
-          ...prev, // Keep existing teamA, teamB, etc.
-          status: updatedMatchDto.status, // Update status from backend
-          timeRemaining: updatedMatchDto.remainingDuration // Update remainingDuration from backend
-        };
-        //setMatchData(newMatchData);
-        // If 'start' or 'resume' and timeRemaining was 0, it should now be reset
-        // If 'pause', timeRemaining will be the calculated remaining duration
-        // If 'end', timeRemaining will be 0 and status 'COMPLETED'
-        return newMatchData;
+        if (!prev) return prev;
+        return { ...prev, status: updatedMatchDto.status };
       });
+      setServerTime({ remaining: updatedMatchDto.remainingDuration, fetchedAt: now });
 
-      //alert(`Match action '${actionType}' was successful!`);
+      // If match ends, clear all intervals immediately
+      if (actionType === 'end' || updatedMatchDto.status === 'COMPLETED') {
+          if (mainIntervalRef.current) clearInterval(mainIntervalRef.current);
+          if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
+          mainIntervalRef.current = null;
+          syncIntervalRef.current = null;
+          setDisplayTime(0); // Ensure display shows 0
+      }
+
     } catch (err) {
       console.error(`Failed to perform action '${actionType}':`, err.response ? err.response.data : err.message);
       alert(`Error performing action: ${err.response ? err.response.data.message : err.message}. Please try again.`);
-      // Optionally, if an error occurs, you might want to re-fetch to get the true state
-      // or revert optimistic UI updates.
+    } finally {
+      // Always re-fetch to ensure all state is perfectly in sync after any status change
+      // This will get the full ScoreCard including player stats
+      fetchMatchDetails(false);
     }
   };
 
@@ -165,62 +224,57 @@ const UpdateMatch = () => {
   const togglePause = () => handleStatusChange(matchData.status === 'PAUSED' ? 'resume' : 'pause');
 
   const handleScoreUpdate = async (pointsValue) => {
+    if (!matchData) return alert('Match data not loaded.');
     if (!updateForm.selectedPlayer) return alert('Please select a player.');
-    const pointTypeMapping = { raid: 'RAID_POINT', tackle: 'TACKLE_POINT', bonus: 'BONUS_POINT', technical: 'TECHNICAL_POINT', allout: 'ALL_OUT_POINT' };
-    const payload = { teamName: matchData[updateForm.selectedTeam].name, playerId: updateForm.selectedPlayer, pointType: pointTypeMapping[updateForm.pointType], points: pointsValue, };
+    if (matchData.status !== 'LIVE') return alert('Match must be LIVE to update scores.');
+
+    setIsUpdatingScore(true); // Start loading spinner
+
+    const pointTypeMapping = { raid: 'RAID_POINT', tackle: 'TACKLE_POINT',allout:"ALL_OUT_POINT",technical:"TECHNICAL_POINT" }; // Removed bonus, technical, allout
+    const payload = {
+      teamName: matchData[updateForm.selectedTeam].name,
+      playerId: updateForm.selectedPlayer,
+      pointType: pointTypeMapping[updateForm.pointType],
+      points: pointsValue,
+    };
+
     try {
-     const res= await axios.put(`${baseURL}/matchstats/match/${matchId}/update/${currentUserID}`, payload, { headers: { 'Authorization': `Bearer ${token}` } });
-      // This part updates the score in the frontend, without needing to refetch all data.
-     console.log('Score update response:', res.data);
-      setMatchData(prev => {
-        const teamKey = updateForm.selectedTeam;
-        const playerIndex = prev[teamKey].players.findIndex(p => p.id === updateForm.selectedPlayer);
-
-        if (playerIndex > -1) {
-            const updatedPlayers = [...prev[teamKey].players];
-            // Assuming points are added to raidPoints or tacklePoints based on pointType
-            if (updateForm.pointType === 'raid' || updateForm.pointType === 'bonus' || updateForm.pointType === 'technical') {
-                updatedPlayers[playerIndex] = {
-                    ...updatedPlayers[playerIndex],
-                    raidPoints: Math.max(0, updatedPlayers[playerIndex].raidPoints + pointsValue)
-                };
-            } else if (updateForm.pointType === 'tackle') {
-                updatedPlayers[playerIndex] = {
-                    ...updatedPlayers[playerIndex],
-                    tacklePoints: Math.max(0, updatedPlayers[playerIndex].tacklePoints + pointsValue)
-                };
-            }
-            // All-out points usually affect team score directly, not player points
-            // This calculation needs to be more robust if allout points are separate from player points
-            const newTeamScore = updatedPlayers.reduce((sum, p) => sum + p.raidPoints + p.tacklePoints, 0) + (updateForm.pointType === 'allout' ? pointsValue : 0);
-
-            return {
-                ...prev,
-                [teamKey]: {
-                    ...prev[teamKey],
-                    score: newTeamScore,
-                    players: updatedPlayers
-                }
-            };
-        }
-        return prev;
+      console.log("update payload:", payload);
+      // Backend returns MatchDto (basic match info), but we need the full ScoreCard
+      await axios.put(`${baseURL}/matchstats/match/${matchId}/update/${currentUserID}`, payload, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-      //alert('Score updated successfully!');
+      console.log('Score update request sent. Re-fetching match details to sync UI...');
+
+      // Re-fetch ALL match details to ensure the frontend state is fully synchronized with the backend.
+      // This will update all scores and player stats based on the backend's comprehensive ScoreCard.
+      await fetchMatchDetails(false); // Don't show loading spinner for this immediate re-sync
+
     } catch (err) {
       console.error('Failed to update score:', err);
-      alert('Error updating score. Please try again.');
+      alert(`Error updating score: ${err.response ? err.response.data.message : err.message}. Please try again.`);
+    } finally {
+      setIsUpdatingScore(false); // Stop loading spinner
     }
   };
 
 
   const getSelectedPointType = () => pointTypes.find(type => type.value === updateForm.pointType);
+
   const handleTeamChange = (e) => {
     const newTeam = e.target.value;
-    setUpdateForm(prev => ({ ...prev, selectedTeam: newTeam, selectedPlayer: matchData[newTeam].players[0]?.id || '' }));
+    const playersOfNewTeam = matchData[newTeam]?.players || [];
+    setUpdateForm(prev => ({
+      ...prev,
+      selectedTeam: newTeam,
+      selectedPlayer: playersOfNewTeam.length > 0 ? playersOfNewTeam[0].id : '' // Select first player of new team
+    }));
   };
 
   const renderMatchControlButton = () => {
-    // This function logic remains the same and will work correctly.
+    // Check if matchData is null before accessing its properties
+    if (!matchData) return null;
+
     switch (matchData.status) {
       case 'UPCOMING':
         return <button onClick={startMatch} className="flex items-center justify-center gap-2 text-white font-bold py-3 px-6 rounded-xl bg-gradient-to-r from-green-500 to-green-600"><Power /> Start Match</button>;
@@ -252,11 +306,11 @@ const UpdateMatch = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
       <BackButton/>
-      <div className="max-w-6xl mx-auto space-y-8">
+      <div className="max-w-6xl mx-auto space-y-8 mt-3">
         <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 shadow-2xl">
           <div className="text-center mb-8">
             <div className="flex items-center justify-between">
-                <div/> {/* Empty div for spacing */}
+                <div/>
                 <div className="flex items-center justify-center gap-3">
                     <Trophy className="w-8 h-8 text-yellow-400" />
                     <h1 className="text-3xl font-bold text-white">Pro Kabaddi League</h1>
@@ -265,10 +319,9 @@ const UpdateMatch = () => {
             </div>
             <div className="flex items-center justify-center gap-4 text-sm mt-4">
               <span className={`px-3 py-1 rounded-full ${matchData.status === 'LIVE' ? 'bg-red-500 animate-pulse' : 'bg-gray-500'} text-white font-semibold`}>{matchData.status}</span>
-              {/* UI now formats the seconds from state for display */}
               <span className="text-white/80 flex items-center gap-1">
                 <Clock className="w-4 h-4" />
-                {secondsToTime(matchData.timeRemaining)}
+                {secondsToTime(displayTime)} {/* Display the calculated time */}
               </span>
             </div>
           </div>
@@ -285,7 +338,10 @@ const UpdateMatch = () => {
             <div className="md:col-span-1 grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-white/80 text-sm font-semibold mb-2">Select Team</label>
-                <select className="w-full bg-white/20 rounded-xl px-4 py-3 text-white" value={updateForm.selectedTeam} onChange={handleTeamChange}><option value="teamA" className="bg-slate-800">{matchData.teamA.name}</option><option value="teamB" className="bg-slate-800">{matchData.teamB.name}</option></select>
+                <select className="w-full bg-white/20 rounded-xl px-4 py-3 text-white" value={updateForm.selectedTeam} onChange={handleTeamChange}>
+                  <option value="teamA" className="bg-slate-800">{matchData.teamA.name}</option>
+                  <option value="teamB" className="bg-slate-800">{matchData.teamB.name}</option>
+                </select>
               </div>
               <div>
                 <label className="block text-white/80 text-sm font-semibold mb-2">Select Player</label>
@@ -309,13 +365,19 @@ const UpdateMatch = () => {
               </div>
             </div>
             <div className="md:col-span-1 flex items-end gap-3">
-              <button onClick={() => handleScoreUpdate(updateForm.points)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-3 px-4 rounded-xl"><Plus />Add</button>
-              <button onClick={() => handleScoreUpdate(-updateForm.points)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 px-4 rounded-xl"><Minus />Deduct</button>
+              <button onClick={() => handleScoreUpdate(updateForm.points)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-3 px-4 rounded-xl" disabled={isUpdatingScore}>
+                {isUpdatingScore ? <Loader2 className="animate-spin" /> : <Plus />}Add
+              </button>
+              <button onClick={() => handleScoreUpdate(-updateForm.points)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 px-4 rounded-xl" disabled={isUpdatingScore}>
+                {isUpdatingScore ? <Loader2 className="animate-spin" /> : <Minus />}Deduct
+              </button>
             </div>
           </div>
         </div>
+
       </div>
     </div>
+
   );
 };
 
