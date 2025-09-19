@@ -131,7 +131,8 @@ const Signup = () => {
                 onChange={(e) => setAge(e.target.value)}
                 className="w-full bg-white/10 border border-white/20 rounded-xl py-3 pl-10 pr-4 text-white"
                 required
-                min="1" // ✅ prevents negative in UI
+                min="1" 
+                max="100"// ✅ prevents negative in UI
               />
             </div>
           </div>
