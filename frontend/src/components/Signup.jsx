@@ -1,61 +1,74 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { User, Mail, Lock, UserPlus, Hash, BarChart, TrendingUp, Loader2 } from 'lucide-react'; // ⬅️ Loader2 icon for spinner
+import { User, Mail, Lock, UserPlus, Hash, Loader2 } from 'lucide-react'; 
 import { baseURL } from '../utils/constants';
+import toast, { Toaster } from 'react-hot-toast'; // ✅ toast
 
 const Signup = () => {
   const navigate = useNavigate();
 
   // Form states
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState(''); // renamed for clarity
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [age, setAge] = useState('');
-  const [height, setHeight] = useState('');
-  const [weight, setWeight] = useState('');
 
   // Loading state
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    // Validations
     if (password !== confirmPassword) {
-      alert("Passwords don't match!");
+      toast.error("Passwords don't match!");
+      return;
+    }
+    if (username.length < 3) {
+      toast.error("Username must be at least 3 characters long!");
+      return;
+    }
+    if (parseInt(age, 10) <= 0) {
+      toast.error("Age must be greater than 0!");
       return;
     }
 
-    setLoading(true); // ⬅️ Start loading
+    setLoading(true);
 
     const formData = new FormData();
     formData.append('name', name);
-    formData.append('username', email);
+    formData.append('username', username);
     formData.append('password', password);
     formData.append('phone', "0000000000");
     formData.append('location', "Not specified");
     formData.append('about', "A new Kabaddi enthusiast!");
     formData.append('age', parseInt(age, 10) || 0);
-    formData.append('height', parseFloat(height) || 0);
-    formData.append('weight', parseFloat(weight) || 0);
 
     try {
       await axios.post(baseURL + '/auth/register', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      alert('Account created successfully! Redirecting to login...');
-      navigate('/login');
+      toast.success('Account created successfully! Redirecting to login...');
+      setTimeout(() => navigate('/login'), 1500);
     } catch (error) {
-      console.error('Signup failed:', error);
-      alert(`Signup failed: ${error.response ? error.response.data.message : error.message}`);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        'Signup failed. Please try again.';
+      toast.error(errorMessage);
     } finally {
-      setLoading(false); // ⬅️ Stop loading regardless of success/failure
+      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-6">
+      {/* ✅ Toaster added */}
+      <Toaster position="top-right" reverseOrder={false} />
+
       <div className="w-full max-w-md bg-white/5 backdrop-blur-lg rounded-3xl border border-white/10 shadow-2xl p-10">
 
         {/* Header */}
@@ -71,7 +84,7 @@ const Signup = () => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Name */}
+          {/* Full Name */}
           <div>
             <label className="block text-gray-300 font-medium mb-2" htmlFor="name">Full Name</label>
             <div className="relative">
@@ -90,43 +103,36 @@ const Signup = () => {
 
           {/* Username */}
           <div>
-            <label className="block text-gray-300 font-medium mb-2" htmlFor="email">Username</label>
+            <label className="block text-gray-300 font-medium mb-2" htmlFor="username">Username</label>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
-                id="email"
+                id="username"
                 type="text"
-                placeholder="you1"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder="yourname123"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full bg-white/10 border border-white/20 rounded-xl py-3 pl-12 pr-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 required
               />
             </div>
           </div>
 
-          {/* Age/Height/Weight */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-gray-300 font-medium mb-2" htmlFor="age">Age</label>
-              <div className="relative">
-                <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input id="age" type="number" placeholder="25" value={age} onChange={(e) => setAge(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl py-3 pl-10 pr-4 text-white" required />
-              </div>
-            </div>
-            <div>
-              <label className="block text-gray-300 font-medium mb-2" htmlFor="height">Height (cm)</label>
-              <div className="relative">
-                <BarChart className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input id="height" type="number" placeholder="180" value={height} onChange={(e) => setHeight(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl py-3 pl-10 pr-4 text-white" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-gray-300 font-medium mb-2" htmlFor="weight">Weight (kg)</label>
-              <div className="relative">
-                <TrendingUp className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input id="weight" type="number" placeholder="75" value={weight} onChange={(e) => setWeight(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl py-3 pl-10 pr-4 text-white" />
-              </div>
+          {/* Age */}
+          <div>
+            <label className="block text-gray-300 font-medium mb-2" htmlFor="age">Age</label>
+            <div className="relative">
+              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                id="age"
+                type="number"
+                placeholder="25"
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+                className="w-full bg-white/10 border border-white/20 rounded-xl py-3 pl-10 pr-4 text-white"
+                required
+                min="1" // ✅ prevents negative in UI
+              />
             </div>
           </div>
 
